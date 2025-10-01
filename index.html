@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pinyin Panda Typing Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Inter',sans-serif;background-color:#f0fdf4}
+    .game-container{font-family:'Fredoka One',cursive;text-align:center}
+    .panda-container{position:relative;width:150px;height:150px;margin:0 auto}
+    .panda-face{width:150px;height:150px;background:white;border:4px solid #333;border-radius:50%;position:absolute;transition:transform .3s ease}
+    .ear{width:50px;height:50px;background:#333;border-radius:50%;position:absolute;top:-10px}
+    .ear.left{left:-10px}.ear.right{right:-10px}
+    .eye{width:40px;height:50px;background:#333;border-radius:50%;position:absolute;top:40px}
+    .eye.left{left:25px}.eye.right{right:25px}
+    .pupil{width:12px;height:12px;background:white;border-radius:50%;position:absolute;top:15px;left:15px;transition:transform .2s}
+    .nose{width:25px;height:18px;background:#333;border-radius:50% 50% 40% 40%/60% 60% 40% 40%;position:absolute;top:85px;left:62.5px}
+    .mouth{width:30px;height:15px;border:3px solid transparent;border-bottom-color:#333;border-radius:0 0 100px 100px/0 0 50px 50px;position:absolute;top:95px;left:60px}
+    #character-display-container{position:relative;cursor:pointer}
+    #character-display{font-size:clamp(3rem,12vw,8rem);line-height:1;color:#166534;margin:1rem 0;text-shadow:2px 2px 4px rgba(0,0,0,.1);transition:transform .2s}
+    #character-display:hover{transform:scale(1.05)}
+    #speaker-icon{position:absolute;top:50%;right:20%;transform:translateY(-50%);font-size:2rem;color:#9ca3af;opacity:0;transition:opacity .3s}
+    #character-display-container:hover #speaker-icon{opacity:1}
+    .feedback{height:30px;font-size:1.25rem;margin-top:.5rem;font-weight:bold}
+    .correct{color:#22c55e}.incorrect{color:#ef4444}
+    @keyframes shake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-5px)}20%,40%,60%,80%{transform:translateX(5px)}}
+    .shake{animation:shake .5s}
+    .progress-bar-container{width:100%;background:#e5e7eb;border-radius:9999px;height:20px;overflow:hidden;border:2px solid #a3a3a3}
+    .progress-bar{background:#4ade80;height:100%;width:0%;transition:width .5s ease-in-out;border-radius:9999px}
+    @keyframes float-up{from{opacity:1;transform:translateY(0) scale(1)}to{opacity:0;transform:translateY(-50px) scale(1.5)}}
+    .score-plus{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:2rem;color:#f59e0b;text-shadow:0 1px 2px rgba(0,0,0,.25);pointer-events:none;animation:float-up .8s ease-out forwards}
+    @media (prefers-reduced-motion: reduce){.shake,.score-plus,.panda-face{animation:none !important;transition:none !important}}
+  </style>
+</head>
+<body class="bg-green-50 flex items-center justify-center min-h-screen p-4">
+  <div class="game-container w-full max-w-2xl mx-auto bg-white p-6 md:p-8 rounded-2xl shadow-lg border-4 border-gray-700">
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6">
+      <div class="flex items-center gap-4">
+        <div class="panda-container" aria-hidden="true">
+          <div class="panda-face">
+            <div class="ear left"></div><div class="ear right"></div>
+            <div class="eye left"><div class="pupil"></div></div>
+            <div class="eye right"><div class="pupil"></div></div>
+            <div class="nose"></div><div class="mouth"></div>
+          </div>
+        </div>
+        <h1 class="text-3xl md:text-4xl text-gray-800">Pinyin Panda</h1>
+      </div>
+      <div class="text-2xl md:text-3xl bg-yellow-300 px-4 py-2 rounded-lg border-2 border-gray-700 shadow-sm mt-4 md:mt-0" aria-live="polite">
+        Score: <span id="score" class="font-bold">0</span>
+      </div>
+    </div>
+
+    <div class="mb-6">
+      <div class="progress-bar-container">
+        <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+      </div>
+    </div>
+
+    <div id="game-area">
+      <p class="text-lg text-gray-700 mb-1">Click the big character to hear it.</p>
+      <div id="character-display-container" role="button" aria-label="Play pronunciation">
+        <div id="character-display" class="select-none"></div>
+        <div id="speaker-icon" aria-hidden="true">🔊</div>
+      </div>
+
+      <div id="definition-box" class="min-h-[3rem] text-lg bg-green-100 border-2 border-green-300 text-green-800 p-2 rounded-lg my-2 opacity-0 transition-opacity duration-300"></div>
+
+      <input type="text" id="pinyin-input" placeholder="type pinyin with tones e.g. ni3 hao3" 
+        autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="latin"
+        class="w-full max-w-md mx-auto mt-2 p-4 text-2xl border-4 border-gray-400 rounded-lg text-center focus:border-green-500 focus:ring-green-500 transition duration-300" />
+
+      <div id="feedback" class="feedback" aria-live="polite"></div>
+
+      <div class="flex gap-4 justify-center mt-3">
+        <button id="hint-button" class="w-1/2 max-w-sm bg-blue-500 hover:bg-blue-600 text-white font-bold text-lg py-3 px-4 rounded-lg shadow-md transition transform hover:scale-105" aria-label="Show hint">💡 Hint</button>
+        <button id="check-button" class="w-1/2 max-w-sm bg-green-500 hover:bg-green-600 text-white font-bold text-lg py-3 px-4 rounded-lg shadow-md transition transform hover:scale-105" aria-label="Check answer">Check</button>
+      </div>
+    </div>
+
+    <div id="game-over-screen" class="hidden text-center">
+      <h2 class="text-5xl text-green-600 mb-4">Great Job!</h2>
+      <p class="text-2xl text-gray-700 mb-2">Your final score is:</p>
+      <p id="final-score" class="text-6xl font-bold text-yellow-500 mb-6"></p>
+      <img src="https://placehold.co/200x200/a7f3d0/14532d?text=🎉" alt="Celebration" class="mx-auto rounded-full mb-6">
+      <button id="restart-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold text-2xl py-4 px-8 rounded-lg shadow-md transition transform hover:scale-105" aria-label="Play again">Play Again</button>
+      <p class="mt-4 text-gray-600 text-sm">Tip: you can upload this file to GitHub Pages to share a link.</p>
+    </div>
+  </div>
+
+  <script>
+    // Vocabulary (same as before)
+    const vocabulary = [
+      { character: '本子', pinyin: 'ben3 zi5', english: 'notebook' },
+      { character: '在哪里', pinyin: 'zai4 na3 li3', english: 'where is it?' },
+      { character: '桌子', pinyin: 'zhuo1 zi5', english: 'table, desk' },
+      { character: '上面', pinyin: 'shang4 mian4', english: 'on top of, above' },
+      { character: '书包', pinyin: 'shu1 bao1', english: 'school bag' },
+      { character: '椅子', pinyin: 'yi3 zi5', english: 'chair' },
+      { character: '下面', pinyin: 'xia4 mian4', english: 'under, below' },
+      { character: '苹果', pinyin: 'ping2 guo3', english: 'apple' },
+      { character: '冰箱', pinyin: 'bing1 xiang1', english: 'refrigerator' },
+      { character: '里面', pinyin: 'li3 mian4', english: 'inside' },
+      { character: '西瓜', pinyin: 'xi1 gua1', english: 'watermelon' },
+      { character: '外面', pinyin: 'wai4 mian4', english: 'outside' },
+      { character: '小老鼠', pinyin: 'xiao3 lao3 shu3', english: 'little mouse' },
+      { character: '电脑', pinyin: 'dian4 nao3', english: 'computer' },
+      { character: '前面', pinyin: 'qian2 mian4', english: 'in front' },
+      { character: '小猫', pinyin: 'xiao3 mao1', english: 'kitten' },
+      { character: '后面', pinyin: 'hou4 mian4', english: 'behind' },
+      { character: '春天', pinyin: 'chun1 tian1', english: 'Spring (season)' },
+      { character: '眼睛', pinyin: 'yan3 jing5', english: 'eye' },
+      { character: '花', pinyin: 'hua1', english: 'flower' },
+      { character: '草', pinyin: 'cao3', english: 'grass' },
+      { character: '爸爸', pinyin: 'ba4 ba5', english: 'dad' },
+      { character: '妈妈', pinyin: 'ma1 ma5', english: 'mom' },
+      { character: '工作', pinyin: 'gong1 zuo4', english: 'work, job' },
+      { character: '老师', pinyin: 'lao3 shi1', english: 'teacher' },
+      { character: '医生', pinyin: 'yi1 sheng1', english: 'doctor' },
+      { character: '哥哥', pinyin: 'ge1 ge5', english: 'older brother' },
+      { character: '学生', pinyin: 'xue2 sheng1', english: 'student' },
+      { character: '喜欢', pinyin: 'xi3 huan1', english: 'to like' },
+      { character: '跑步', pinyin: 'pao3 bu4', english: 'to run, jog' },
+      { character: '打篮球', pinyin: 'da3 lan2 qiu2', english: 'play basketball' },
+      { character: '游泳', pinyin: 'you2 yong3', english: 'to swim' },
+      { character: '运动员', pinyin: 'yun4 dong4 yuan2', english: 'athlete' },
+      { character: '演员', pinyin: 'yan3 yuan2', english: 'actor/actress' },
+      { character: '警察', pinyin: 'jing3 cha2', english: 'police officer' },
+      { character: '现在', pinyin: 'xian4 zai4', english: 'now' },
+      { character: '几点', pinyin: 'ji3 dian3', english: 'what time?' },
+      { character: '起床', pinyin: 'qi3 chuang2', english: 'to get up' },
+      { character: '吃早饭', pinyin: 'chi1 zao3 fan4', english: 'eat breakfast' },
+      { character: '上学', pinyin: 'shang4 xue2', english: 'go to school' },
+      { character: '放学', pinyin: 'fang4 xue2', english: 'finish school' },
+      { character: '做功课', pinyin: 'zuo4 gong1 ke4', english: 'do homework' },
+      { character: '睡觉', pinyin: 'shui4 jiao4', english: 'to sleep' },
+      { character: '回家', pinyin: 'hui2 jia1', english: 'go home' },
+      { character: '房间', pinyin: 'fang2 jian1', english: 'room' },
+      { character: '床', pinyin: 'chuang2', english: 'bed' },
+      { character: '沙发', pinyin: 'sha1 fa1', english: 'sofa' },
+      { character: '书架', pinyin: 'shu1 jia4', english: 'bookshelf' },
+      { character: '玩具', pinyin: 'wan2 ju4', english: 'toy' },
+      { character: '写字', pinyin: 'xie3 zi4', english: 'to write characters' },
+      { character: '足球', pinyin: 'zu2 qiu2', english: 'soccer' },
+      { character: '生日', pinyin: 'sheng1 ri4', english: 'birthday' },
+      { character: '颜色', pinyin: 'yan2 se4', english: 'color' },
+      { character: '看书', pinyin: 'kan4 shu1', english: 'to read books' },
+      { character: '星期天', pinyin: 'xing1 qi1 tian1', english: 'Sunday' },
+      { character: '看电视', pinyin: 'kan4 dian4 shi4', english: 'watch TV' },
+      { character: '姐姐', pinyin: 'jie3 jie5', english: 'older sister' },
+      { character: '妹妹', pinyin: 'mei4 mei5', english: 'younger sister' },
+      { character: '弟弟', pinyin: 'di4 di5', english: 'younger brother' },
+      { character: '好朋友', pinyin: 'hao3 peng2 you5', english: 'good friend' },
+      { character: '听音乐', pinyin: 'ting1 yin1 yue4', english: 'listen to music' },
+      { character: '小狗', pinyin: 'xiao3 gou3', english: 'puppy' },
+      { character: '唱歌', pinyin: 'chang4 ge1', english: 'to sing' },
+      { character: '打电话', pinyin: 'da3 dian4 hua4', english: 'make a phone call' },
+      { character: '你好', pinyin: 'ni3 hao3', english: 'hello' },
+      { character: '对不起', pinyin: 'dui4 bu5 qi3', english: "I'm sorry" },
+      { character: '没关系', pinyin: 'mei2 guan1 xi5', english: "it's okay" },
+      { character: '不客气', pinyin: 'bu2 ke4 qi5', english: "you're welcome" },
+      { character: '再见', pinyin: 'zai4 jian4', english: 'goodbye' },
+      { character: '数学', pinyin: 'shu4 xue2', english: 'math' },
+      { character: '科学', pinyin: 'ke1 xue2', english: 'science' },
+      { character: '美术', pinyin: 'mei3 shu4', english: 'art' },
+      { character: '体育', pinyin: 'ti3 yu4', english: 'P.E.' },
+      { character: '音乐', pinyin: 'yin1 yue4', english: 'music' },
+      { character: '中文', pinyin: 'zhong1 wen2', english: 'Chinese language' },
+      { character: '身体', pinyin: 'shen1 ti3', english: 'body, health' },
+      { character: '鼻子', pinyin: 'bi2 zi5', english: 'nose' },
+      { character: '嘴巴', pinyin: 'zui3 ba1', english: 'mouth' },
+      { character: '耳朵', pinyin: 'er3 duo5', english: 'ear' },
+      { character: '可爱', pinyin: 'ke3 ai4', english: 'cute' },
+      { character: '大象', pinyin: 'da4 xiang4', english: 'elephant' },
+      { character: '客厅', pinyin: 'ke4 ting1', english: 'living room' },
+      { character: '厨房', pinyin: 'chu2 fang2', english: 'kitchen' },
+      { character: '卧室', pinyin: 'wo4 shi4', english: 'bedroom' },
+      { character: '动物园', pinyin: 'dong4 wu4 yuan2', english: 'zoo' },
+      { character: '老虎', pinyin: 'lao3 hu3', english: 'tiger' },
+      { character: '狮子', pinyin: 'shi1 zi5', english: 'lion' },
+      { character: '长颈鹿', pinyin: 'chang2 jing3 lu4', english: 'giraffe' },
+      { character: '袋鼠', pinyin: 'dai4 shu3', english: 'kangaroo' },
+      { character: '斑马', pinyin: 'ban1 ma3', english: 'zebra' },
+      { character: '猴子', pinyin: 'hou2 zi5', english: 'monkey' },
+      { character: '大熊猫', pinyin: 'da4 xiong2 mao1', english: 'giant panda' },
+      { character: '漂亮', pinyin: 'piao4 liang5', english: 'beautiful' },
+      { character: '蛋糕', pinyin: 'dan4 gao1', english: 'cake' },
+      { character: '饭馆', pinyin: 'fan4 guan3', english: 'restaurant' },
+      { character: '饮料', pinyin: 'yin3 liao4', english: 'beverage' },
+      { character: '米饭', pinyin: 'mi3 fan4', english: 'cooked rice' },
+      { character: '多少钱', pinyin: 'duo1 shao3 qian2', english: 'how much money?' },
+      { character: '中国菜', pinyin: 'zhong1 guo2 cai4', english: 'Chinese food' },
+      { character: '水饺', pinyin: 'shui3 jiao3', english: 'dumplings' }
+    ];
+
+    function fisherYatesShuffle(arr){
+      const a = arr.slice();
+      for(let i=a.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [a[i],a[j]] = [a[j],a[i]];
+      }
+      return a;
+    }
+    function normalizePinyin(input){
+      return input.trim().toLowerCase().replace(/ü/g,'v').replace(/\s+/g,' ').replace(/([a-z]+)(5)?\\b/g,'$1');
+    }
+    function answersMatch(user, correct){
+      const u = normalizePinyin(user).replace(/ /g,'');
+      const c = normalizePinyin(correct).replace(/ /g,'');
+      return u === c;
+    }
+
+    let currentWordIndex=0, score=0, shuffledVocabulary=[], audioContext, missCount=0;
+
+    const characterDisplayContainer=document.getElementById('character-display-container');
+    const characterDisplay=document.getElementById('character-display');
+    const pinyinInput=document.getElementById('pinyin-input');
+    const feedbackEl=document.getElementById('feedback');
+    const scoreEl=document.getElementById('score');
+    const checkButton=document.getElementById('check-button');
+    const hintButton=document.getElementById('hint-button');
+    const definitionBox=document.getElementById('definition-box');
+    const restartButton=document.getElementById('restart-button');
+    const gameArea=document.getElementById('game-area');
+    const gameOverScreen=document.getElementById('game-over-screen');
+    const finalScoreEl=document.getElementById('final-score');
+    const progressBar=document.getElementById('progress-bar');
+    const pupilLeft=document.querySelector('.eye.left .pupil');
+    const pupilRight=document.querySelector('.eye.right .pupil');
+    const pandaFace=document.querySelector('.panda-face');
+
+    function setupAudio(){
+      if(!audioContext){
+        try{ audioContext = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+      }
+    }
+    async function playSound(type){
+      if(!audioContext) return;
+      if(audioContext.state==='suspended') await audioContext.resume();
+      const osc=audioContext.createOscillator(), g=audioContext.createGain();
+      osc.connect(g); g.connect(audioContext.destination);
+      if(type==='correct'){ osc.type='sine'; osc.frequency.value=600; g.gain.value=.3; g.gain.exponentialRampToValueAtTime(1e-5,audioContext.currentTime+.5); }
+      else{ osc.type='square'; osc.frequency.value=150; g.gain.value=.2; g.gain.exponentialRampToValueAtTime(1e-5,audioContext.currentTime+.3); }
+      osc.start(); osc.stop(audioContext.currentTime+.5);
+    }
+    function speak(text){
+      if(!('speechSynthesis'in window))return;
+      window.speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=.8;
+      window.speechSynthesis.speak(u);
+    }
+
+    function startGame(){
+      shuffledVocabulary=fisherYatesShuffle(vocabulary);
+      currentWordIndex=0; score=0; missCount=0;
+      updateScore(); updateProgressBar(); displayWord();
+      gameArea.classList.remove('hidden'); gameOverScreen.classList.add('hidden');
+      pinyinInput.value=''; pinyinInput.disabled=false;
+      checkButton.disabled=false; hintButton.disabled=false;
+      feedbackEl.textContent=''; pinyinInput.focus(); pinyinInput.select();
+    }
+    function displayWord(){
+      if(currentWordIndex<shuffledVocabulary.length){
+        const current=shuffledVocabulary[currentWordIndex];
+        characterDisplay.textContent=current.character;
+        definitionBox.textContent=`Hint: ${current.english}`;
+        definitionBox.style.opacity='0';
+      } else endGame();
+    }
+    function updateScore(){ scoreEl.textContent=score*10; }
+    function updateProgressBar(){
+      const p=(currentWordIndex/shuffledVocabulary.length)*100;
+      progressBar.style.width=`${p}%`; progressBar.setAttribute('aria-valuenow',Math.floor(p));
+    }
+    function endGame(){
+      gameArea.classList.add('hidden'); gameOverScreen.classList.remove('hidden');
+      finalScoreEl.textContent=score*10; pinyinInput.disabled=true; checkButton.disabled=true; hintButton.disabled=true;
+    }
+    function showHint(){ definitionBox.style.opacity='1'; }
+    function checkAnswer(){
+      const correct=shuffledVocabulary[currentWordIndex].pinyin;
+      const user=pinyinInput.value;
+      if(!user){ pinyinInput.classList.add('shake','border-red-500'); setTimeout(()=>pinyinInput.classList.remove('shake'),500); return; }
+      if(answersMatch(user,correct)){
+        playSound('correct'); score++; missCount=0;
+        feedbackEl.textContent='Correct! 🎉'; feedbackEl.className='feedback correct';
+        pinyinInput.classList.remove('shake','border-red-500'); pinyinInput.classList.add('border-green-500');
+        pandaFace.style.transform='scale(1.1) rotate(5deg)';
+        const plus=document.createElement('div'); plus.textContent='+10'; plus.className='score-plus';
+        characterDisplayContainer.appendChild(plus); setTimeout(()=>plus.remove(),800);
+        setTimeout(()=>{
+          currentWordIndex++; updateScore(); updateProgressBar(); displayWord();
+          pinyinInput.value=''; feedbackEl.textContent=''; pinyinInput.classList.remove('border-green-500');
+          pandaFace.style.transform='scale(1) rotate(0deg)'; pinyinInput.focus(); pinyinInput.select();
+        },900);
+      } else {
+        playSound('incorrect'); missCount++;
+        feedbackEl.textContent=missCount===2?`Hint: starts with “${correct.split(' ')[0]} …”`:'Try again! 🙈';
+        feedbackEl.className='feedback incorrect'; pinyinInput.classList.add('shake','border-red-500');
+        pandaFace.style.transform='rotate(-5deg)';
+        if(missCount>=2){ shuffledVocabulary.push(shuffledVocabulary[currentWordIndex]); missCount=0; }
+        setTimeout(()=>{ pinyinInput.classList.remove('shake'); pandaFace.style.transform='rotate(0deg)'; },500);
+      }
+    }
+
+    document.body.addEventListener('click', setupAudio, { once:true });
+    checkButton.addEventListener('click', checkAnswer);
+    hintButton.addEventListener('click', showHint);
+    pinyinInput.addEventListener('keydown', e=>{ if(e.key==='Enter') checkAnswer(); });
+    pinyinInput.addEventListener('focus', ()=> pinyinInput.select());
+    characterDisplayContainer.addEventListener('click', ()=>{ if(currentWordIndex<shuffledVocabulary.length) speak(shuffledVocabulary[currentWordIndex].character); });
+    restartButton?.addEventListener('click', ()=>{ startGame(); pinyinInput.focus(); });
+
+    document.addEventListener('mousemove', e=>{
+      const {clientX,clientY}=e; const rect=pinyinInput.getBoundingClientRect();
+      const ix=rect.left+rect.width/2, iy=rect.top+rect.height/2;
+      const dx=clientX-ix, dy=clientY-iy; const ang=Math.atan2(dy,dx);
+      const mx=Math.cos(ang)*4, my=Math.sin(ang)*2;
+      pupilLeft.style.transform=`translate(${mx}px,${my}px)`; pupilRight.style.transform=`translate(${mx}px,${my}px)`;
+    });
+
+    startGame();
+  </script>
+</body>
+</html>
